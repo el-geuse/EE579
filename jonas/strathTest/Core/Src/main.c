@@ -117,6 +117,12 @@ int main(void)
   MX_UCPD1_Init();
   MX_USB_PCD_Init();
   MX_I2C2_Init();
+
+
+
+
+
+
   /* USER CODE BEGIN 2 */
   uint8_t buf[10];
   uint16_t distance, clear1, clear2, red, green, blue;
@@ -135,8 +141,10 @@ int main(void)
 	//HAL_Delay(10);
 	//myState = HAL_I2C_Master_Receive(&hi2c2, (uint8_t)0x21, buf, 4, HAL_MAX_DELAY);
 
-
+	//COMMENTS MISSING
 	HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
+
+
 	distance = getLidarDistance(&hi2c2);
 	clear1 = getAPDSData(&hi2c2, buf);
 	clear2 = buf[2] << 8 | buf[1];

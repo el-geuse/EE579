@@ -1,0 +1,2 @@
+../Core/Src/sensors.c:10:10:getLidarDistance	40	static
+../Core/Src/sensors.c:33:10:getAPDSData	32	static

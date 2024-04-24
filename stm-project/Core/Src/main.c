@@ -51,7 +51,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-extern uint16_t clear1, clear2, red, green, blue;
+extern uint16_t clear, red, green, blue, apdsDistance;
 
 /* USER CODE END PV */
 
@@ -109,10 +109,10 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
+  sensorsAdcInit(&hadc1);
+  sensorsI2CInit(&hi2c2);
   initAPDS(&hi2c2);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-  sensorsAdcInit(&hadc1);
-  //HAL_ADC_Start(&hadc1);
 
   /* USER CODE END 2 */
 
@@ -120,17 +120,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint16_t distance, distance2;
-	  // distance = getLidarDistance(&hi2c2);
-	  //getAPDSData(&hi2c2);
-	  distance = getIrLeftDistance();
-	  getAPDSData();
-	  distance = green;
-	  TIM3->CCR2 = percentageToTIM3(distanceToPercentage(distance));
-	  distance2 = getIrRightDistance();
+	  uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
 
+	  nearDistance = apdsDistance;
+	  lidarDistance = getLidarDistance();
+	  irLeftDistance = getIrLeftDistance();
+	  irRightDistance = getIrRightDistance();
 
-
+	  TIM3->CCR2 = percentageToTIM3(distanceToPercentage(nearDistance));
 
     /* USER CODE END WHILE */
 

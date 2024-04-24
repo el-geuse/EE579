@@ -8,8 +8,8 @@
 #ifndef INC_DATA_LUT_H_
 #define INC_DATA_LUT_H_
 
-typedef struct { double x; double y; } coord_t;
-double interp(coord_t *c, double x, int n);
+typedef struct {float x; float y;} coord_t;
+float interp(coord_t *c, float x, int n);
 
 coord_t lut_GP2Y0A02YK0F[15] =
 {
@@ -28,7 +28,6 @@ coord_t lut_GP2Y0A02YK0F[15] =
 		{1.95,30},
 		{2.55,20},
 		{2.75,15}
-
 };
 
 #endif /* INC_DATA_LUT_H_ */

@@ -8,11 +8,9 @@
  *
  */
 
-typedef struct { double x; double y; } coord_t;
-double interp(coord_t *c, double x, int n);
+typedef struct {float x; float y;} coord_t;
 
-
-double interp(coord_t *c, double x, int n )
+float interp(coord_t *c, float x, int n )
 {
     int i;
 
@@ -20,8 +18,8 @@ double interp(coord_t *c, double x, int n )
     {
         if ( c[i].x <= x && c[i+1].x >= x )
         {
-            double diffx = x - c[i].x;
-            double diffn = c[i+1].x - c[i].x;
+        	float diffx = x - c[i].x;
+        	float diffn = c[i+1].x - c[i].x;
 
             return c[i].y + ( c[i+1].y - c[i].y ) * diffx / diffn;
         }

@@ -13,7 +13,7 @@
 //#define rightIR_GP2Y0A02YK0F
 #define rightIR_GP2Y0A41SK0F
 
-uint16_t clear1, clear2, red, green, blue;
+uint16_t clear, red, green, blue, apdsDistance;
 I2C_HandleTypeDef *i2c;
 ADC_HandleTypeDef *hadc_ir;
 
@@ -30,10 +30,12 @@ void sensorsI2CInit(I2C_HandleTypeDef *hi2c)
 
 void initAPDS()
 {
-  uint8_t sent[] = {0x80, 0x03};
-  uint8_t debug = HAL_I2C_Master_Transmit(i2c, (uint8_t)0x39*2, sent, 2, HAL_MAX_DELAY);
-  uint8_t sent2[] = {0x8F, 0x03};
-  uint8_t debug2 = HAL_I2C_Master_Transmit(i2c, (uint8_t)0x39*2, sent2, 2, HAL_MAX_DELAY);
+	uint8_t debug;
+	uint8_t sent[] = {0x80, 0x07};
+	uint8_t sent2[] = {0x8F, 0x0F};
+
+	debug = HAL_I2C_Master_Transmit(i2c, (uint8_t)0x39*2, sent, 2, HAL_MAX_DELAY);
+	debug = HAL_I2C_Master_Transmit(i2c, (uint8_t)0x39*2, sent2, 2, HAL_MAX_DELAY);
 }
 
 uint16_t getLidarDistance()
@@ -63,7 +65,6 @@ uint16_t fetchAPDSData(I2C_HandleTypeDef *i2c, uint8_t *data)
 {
 	uint8_t sent[] = {0x93};
 	uint8_t comError = 0;
-	uint16_t clear;
 
 	if (HAL_I2C_Master_Transmit(i2c, (uint8_t)0x39*2, sent, 1, HAL_MAX_DELAY)
 	 || HAL_I2C_Master_Receive(i2c, (uint8_t)0x39*2+1, data, 10, HAL_MAX_DELAY))
@@ -71,20 +72,19 @@ uint16_t fetchAPDSData(I2C_HandleTypeDef *i2c, uint8_t *data)
 		comError = 1;
 	}
 
-	if (comError == 0) {
-		clear = (data[2] << 8) | data[1];
-	} else {
+	if (comError) {
 		clear = 0;
 	}
+
 
 	return clear;
 }
 
-uint32_t percentageToTIM3(uint32_t percentage) {
+uint16_t percentageToTIM3(uint32_t percentage) {
 	return (uint32_t)65535 * percentage / 100;
 }
 
-uint32_t distanceToPercentage(uint32_t distance) {
+uint16_t distanceToPercentage(uint32_t distance) {
 	if (distance > 105)
 		distance = 100;
 	if (distance < 005)
@@ -94,14 +94,15 @@ uint32_t distanceToPercentage(uint32_t distance) {
 	return ((uint32_t)100 - distance) * ((uint32_t)100 - distance) *((uint32_t)100 - distance) / 10000;
 }
 
-void getAPDSData()
+void refreshAPDSData()
 {
 	uint8_t buf[10];
-	clear1 = fetchAPDSData(i2c, buf);
-	clear2 = buf[2] << 8 | buf[1];
+	fetchAPDSData(i2c, buf);
+	clear = buf[2] << 8 | buf[1];
 	red = buf[4] << 8 | buf[3];
 	green = buf[6] << 8 | buf[5];
 	blue = buf[8] << 8 | buf[7];
+	apdsDistance = buf[9];
 }
 
 uint16_t getIrLeftDistance()

@@ -108,6 +108,36 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
+  TIM3 -> CCR2 =0; // change duty cycle to 0
+  TIM3 -> CCR1 =0; // change duty cycle to 0
+//  TIM1->CCR3 = 0; // Set duty cycle to 0
+//  TIM1->CCR4 = 0; // Set duty cycle to 0
+
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+ // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+ // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+
+
+  //moveBackwards(20); // Move motor backwards
+  //HAL_Delay(3000);  // Delay for 5 second
+  //stopMotor();     // Stop the motor
+  //HAL_Delay(3000);  // Delay for 5 second
+  //moveForwards(20); // Move motor backwards
+  //HAL_Delay(3000);  // Delay for 5 second
+  //stopMotor();     // Stop the motor
+
+  Calibrate();
+  HAL_Delay(5000);  // Delay for 5 second
+  Turn1();
+  HAL_Delay(5000);  // Delay for 5 second
+  Straighten();
+  HAL_Delay(5000);  // Delay for 5 second
+  Turn2();
+  HAL_Delay(5000);  // Delay for 5 second
+  Straighten();
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -115,8 +145,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_8);
-	HAL_Delay(100);
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -363,9 +392,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
+  htim1.Init.Prescaler = 170-1;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 65535;
+  htim1.Init.Period = 999;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -438,9 +467,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
+  htim3.Init.Prescaler = 170-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
+  htim3.Init.Period = 4995;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
@@ -454,7 +483,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 250;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -556,6 +585,56 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void moveBackwards(uint8_t speedPercent) {
+    if (speedPercent > 100) speedPercent = 100; // Limit speed to 100%
+    TIM3->CCR2 = 0;
+    TIM3->CCR1 = (10000 / 100) * speedPercent; // Calculate CCR value
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Start PWM on channel 1
+}
+
+void moveForwards(uint8_t speedPercent) {
+    if (speedPercent > 100) speedPercent = 100; // Limit speed to 100%
+    TIM3->CCR1 = 0;
+    TIM3->CCR2 = (10000 / 100) * speedPercent; // Calculate CCR value
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // Start PWM on channel 2
+}
+
+
+void stopMotor() {
+    TIM3->CCR1 = 0; // Stop channel 1 by setting duty cycle to 0
+    TIM3->CCR2 = 0; // Stop channel 2 by setting duty cycle to 0
+}
+
+void Calibrate(){
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_Delay(500); // 1 second
+
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+    HAL_Delay(500); // 1 second
+
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+}
+
+void Straighten(){
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+
+}
+
+void Turn1(){
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+
+}
+
+void Turn2(){
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+
+}
 
 /* USER CODE END 4 */
 

@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "sensors.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -51,7 +51,6 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-extern uint16_t clear, red, green, blue, apdsDistance;
 
 /* USER CODE END PV */
 
@@ -109,41 +108,31 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
-
   TIM3 -> CCR2 =0; // change duty cycle to 0
   TIM3 -> CCR1 =0; // change duty cycle to 0
-//  TIM1->CCR3 = 0; // Set duty cycle to 0
-//  TIM1->CCR4 = 0; // Set duty cycle to 0
 
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
- // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
- // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-
-
-  //moveBackwards(20); // Move motor backwards
-  //HAL_Delay(3000);  // Delay for 5 second
-  //stopMotor();     // Stop the motor
-  //HAL_Delay(3000);  // Delay for 5 second
-  //moveForwards(20); // Move motor backwards
-  //HAL_Delay(3000);  // Delay for 5 second
-  //stopMotor();     // Stop the motor
 
   Calibrate();
-  HAL_Delay(5000);  // Delay for 5 second
-  Turn1();
-  HAL_Delay(5000);  // Delay for 5 second
-  Straighten();
-  HAL_Delay(5000);  // Delay for 5 second
-  Turn2();
-  HAL_Delay(5000);  // Delay for 5 second
-  Straighten();
+  HAL_Delay(3000);  // Delay for 3 second
+  moveForwards(50); // Move motor backwards
+  HAL_Delay(3000);  // Delay for 3 second
+  stopMotor();     // Stop the motor
+  HAL_Delay(3000);  // Delay for 3 second
+  moveBackwards(50); // Move motor backwards
+  HAL_Delay(3000);  // Delay for 3 second
+  stopMotor();     // Stop the motor
 
-
-  sensorsAdcInit(&hadc1);
-  sensorsI2CInit(&hi2c2);
-  initAPDS(&hi2c2);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+  //Calibrate();
+  //HAL_Delay(5000);  // Delay for 5 second
+  //TurnLeft();
+  //HAL_Delay(5000);  // Delay for 5 second
+  //Straighten();
+  //HAL_Delay(5000);  // Delay for 5 second
+  //TurnRight();
+  //HAL_Delay(5000);  // Delay for 5 second
+  //Straighten();
 
 
   /* USER CODE END 2 */
@@ -152,15 +141,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
-
-	  nearDistance = apdsDistance;
-	  lidarDistance = getLidarDistance();
-	  irLeftDistance = getIrLeftDistance();
-	  irRightDistance = getIrRightDistance();
-
-	  TIM3->CCR2 = percentageToTIM3(distanceToPercentage(nearDistance));
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -240,13 +220,12 @@ static void MX_ADC1_Init(void)
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.GainCompensation = 0;
-  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.NbrOfConversion = 2;
-  hadc1.Init.DiscontinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfDiscConversion = 2;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.DMAContinuousRequests = DISABLE;
@@ -269,19 +248,10 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_247CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -421,7 +391,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 170-1;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 999;
+  htim1.Init.Period = 500;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -496,7 +466,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 170-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 4995;
+  htim3.Init.Period = 749;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
@@ -592,7 +562,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PA7 */
   GPIO_InitStruct.Pin = GPIO_PIN_7;
@@ -600,8 +570,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB4 PB5 PB6 PB8 */
-  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_8;
+  /*Configure GPIO pins : PB4 PB5 PB6 LD2_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -614,15 +584,15 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void moveBackwards(uint8_t speedPercent) {
     if (speedPercent > 100) speedPercent = 100; // Limit speed to 100%
-    TIM3->CCR2 = 0;
-    TIM3->CCR1 = (10000 / 100) * speedPercent; // Calculate CCR value
+    TIM3->CCR2 = 0;                             // Stop PWM Channel 2
+    TIM3->CCR1 = (1000 / 100) * speedPercent; // Calculate CCR value
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Start PWM on channel 1
 }
 
 void moveForwards(uint8_t speedPercent) {
     if (speedPercent > 100) speedPercent = 100; // Limit speed to 100%
-    TIM3->CCR1 = 0;
-    TIM3->CCR2 = (10000 / 100) * speedPercent; // Calculate CCR value
+    TIM3->CCR1 = 0;                             // Stop PWM Channel 1
+    TIM3->CCR2 = (1000 / 100) * speedPercent; // Calculate CCR value
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // Start PWM on channel 2
 }
 
@@ -635,11 +605,7 @@ void stopMotor() {
 void Calibrate(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-    HAL_Delay(500); // 1 second
-
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
-    HAL_Delay(500); // 1 second
+    HAL_Delay(500);
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
@@ -651,13 +617,13 @@ void Straighten(){
 
 }
 
-void Turn1(){
+void TurnLeft(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
 
 }
 
-void Turn2(){
+void TurnRight(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 

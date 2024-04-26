@@ -11,7 +11,7 @@
 void sensorsAdcInit(ADC_HandleTypeDef *hadc);
 void sensorsI2CInit(I2C_HandleTypeDef *hi2c);
 void initAPDS();
-void refreshAPDSData();
+void refreshAPDSData(); // colour update
 uint16_t getLidarDistance();
 uint16_t percentageToTIM3(uint32_t percentage) ;
 uint16_t distanceToPercentage(uint32_t distance);

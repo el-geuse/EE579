@@ -57,3 +57,9 @@ void TurnRight(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 
 }
+
+void Smack(){
+
+}
+
+

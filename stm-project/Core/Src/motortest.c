@@ -108,21 +108,22 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
-  TIM3 -> CCR2 =0; // change duty cycle to 0
-  TIM3 -> CCR1 =0; // change duty cycle to 0
+  //TIM3 -> CCR2 =0; // change duty cycle to 0
+  //TIM3 -> CCR1 =0; // change duty cycle to 0
+  //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+  Smack();
 
-  Calibrate();
-  HAL_Delay(3000);  // Delay for 3 second
-  moveForwards(50); // Move motor backwards
-  HAL_Delay(3000);  // Delay for 3 second
-  stopMotor();     // Stop the motor
-  HAL_Delay(3000);  // Delay for 3 second
-  moveBackwards(50); // Move motor backwards
-  HAL_Delay(3000);  // Delay for 3 second
-  stopMotor();     // Stop the motor
+  //Calibrate();
+  //HAL_Delay(3000);  // Delay for 3 second
+  //moveForwards(50); // Move motor backwards
+  //HAL_Delay(3000);  // Delay for 3 second
+  //stopMotor();     // Stop the motor
+  //HAL_Delay(3000);  // Delay for 3 second
+  //moveBackwards(50); // Move motor backwards
+  //HAL_Delay(3000);  // Delay for 3 second
+  //stopMotor();     // Stop the motor
 
   //Calibrate();
   //HAL_Delay(5000);  // Delay for 5 second
@@ -391,7 +392,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 170-1;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 500;
+  htim1.Init.Period = 19999;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -628,6 +629,16 @@ void TurnRight(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 
 }
+
+void Smack(){
+	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+	TIM1->CCR4 = 2000;
+	HAL_Delay(3000);
+	TIM1->CCR4 = 1500;
+	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_4);
+}
+
+
 
 /* USER CODE END 4 */
 

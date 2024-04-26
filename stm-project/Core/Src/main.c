@@ -118,16 +118,10 @@ int main(void)
   sensorsAdcInit(&hadc1);
   sensorsI2CInit(&hi2c2);
   motorTimInit(&htim3);
-
-  //initAPDS(&hi2c2);
-  //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-
-  stopMotor();
-  HAL_Delay(5000);  // Delay for 5 second
-  moveForwards(50);
-  HAL_Delay(5000);  // Delay for 5 second
+  initAPDS(&hi2c2);
   stopMotor();
 
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2); //PA12 PA12 PA12 PA12
 
   /* USER CODE END 2 */
 
@@ -137,17 +131,18 @@ int main(void)
   {
 	  uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
 
-	  nearDistance = apdsDistance;
 	  lidarDistance = getLidarDistance();
 	  irLeftDistance = getIrLeftDistance();
 	  irRightDistance = getIrRightDistance();
 
-	  TIM1->CCR3 = percentageToTIM3(distanceToPercentage(lidarDistance));
+	  refreshAPDSData();
+	  nearDistance = apdsDistance;
+	  TIM4->CCR2 = percentageToTIM4(distanceToPercentage(nearDistance));
 
-	  HAL_Delay(5000);  // Delay for 5 second
-	  Calibrate();
-	  HAL_Delay(5000);  // Delay for 5 second
-	  Straighten();
+	  //HAL_Delay(5000);  // Delay for 5 second
+	  //Calibrate();
+	  //HAL_Delay(5000);  // Delay for 5 second
+	  //Straighten();
 
 
     /* USER CODE END WHILE */

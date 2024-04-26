@@ -14,6 +14,7 @@ void initAPDS();
 void refreshAPDSData(); // colour update
 uint16_t getLidarDistance();
 uint16_t percentageToTIM3(uint32_t percentage) ;
+uint16_t percentageToTIM4(uint32_t percentage) ;
 uint16_t distanceToPercentage(uint32_t distance);
 uint16_t getIrLeftDistance();
 uint16_t getIrRightDistance();

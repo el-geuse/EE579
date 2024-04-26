@@ -2,6 +2,7 @@
 #include "motortest.h"
 
 TIM_HandleTypeDef *htimMotor;
+TIM_HandleTypeDef *htimSmack;
 
 void motorTimInit(TIM_HandleTypeDef *htim)
 {
@@ -9,6 +10,13 @@ void motorTimInit(TIM_HandleTypeDef *htim)
 	HAL_TIM_PWM_Start(htimMotor, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(htimMotor, TIM_CHANNEL_3);
 	stopMotor();
+}
+
+void SmackInit(TIM_HandleTypeDef *htim)
+{
+	TIM4->CCR2 = 1000;
+	HAL_TIM_PWM_Start(htimSmack, TIM_CHANNEL_2);
+	htimSmack = htim;
 }
 
 void moveBackwards(uint8_t speedPercent) {
@@ -59,7 +67,11 @@ void TurnRight(){
 }
 
 void Smack(){
-
+	TIM4->CCR2 = 2500;
+    HAL_Delay(2000);
+    TIM4->CCR2 = 500;
+    HAL_Delay(4000);
 }
+
 
 

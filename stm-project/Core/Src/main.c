@@ -118,6 +118,7 @@ int main(void)
   sensorsAdcInit(&hadc1);
   sensorsI2CInit(&hi2c2);
   motorTimInit(&htim3);
+  SmackInit(&htim4);
   initAPDS(&hi2c2);
   stopMotor();
 
@@ -146,9 +147,8 @@ int main(void)
 
 	  if (lidarDistance < 30)
 	  {
-		  moveForwards(50);
-		  HAL_Delay(1000);
-		  stopMotor();
+		  HAL_Delay(5000);
+		  Smack();
 	  }
 
     /* USER CODE END WHILE */

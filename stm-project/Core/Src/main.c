@@ -137,13 +137,19 @@ int main(void)
 
 	  refreshAPDSData();
 	  nearDistance = apdsDistance;
-	  TIM4->CCR2 = percentageToTIM4(distanceToPercentage(nearDistance));
+	  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
 
 	  //HAL_Delay(5000);  // Delay for 5 second
 	  //Calibrate();
 	  //HAL_Delay(5000);  // Delay for 5 second
 	  //Straighten();
 
+	  if (lidarDistance < 30)
+	  {
+		  moveForwards(50);
+		  HAL_Delay(1000);
+		  stopMotor();
+	  }
 
     /* USER CODE END WHILE */
 

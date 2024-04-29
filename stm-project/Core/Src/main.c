@@ -80,8 +80,7 @@ static void MX_TIM4_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
-int main(void)
-{
+int main(void) {
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -123,40 +122,88 @@ int main(void)
   stopMotor();
 
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2); //PA12 PA12 PA12 PA12
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+
+  uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
+
+  enum MACHINE_STATES {
+	  MOVESIX,
+	  SEARCH,
+	  APPROACH,
+	  COLOURCHECK,
+	  SMACK,
+	  SHIMMY,
+  };
+
+  int state = MOVESIX;
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-	  uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
 
-	  lidarDistance = getLidarDistance();
-	  irLeftDistance = getIrLeftDistance();
-	  irRightDistance = getIrRightDistance();
+  Calibrate();
 
-	  refreshAPDSData();
-	  nearDistance = apdsDistance;
-	  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
+  while (1) {
+	  // Beginning control loop
+	  switch (state) {
 
-	  //HAL_Delay(5000);  // Delay for 5 second
-	  //Calibrate();
-	  //HAL_Delay(5000);  // Delay for 5 second
-	  //Straighten();
+	  case MOVESIX:
+		  // Moving 6 metres to approach the starting spot.
+//		  lidarDistance = getLidarDistance();
+//		  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
+		  moveForwards(40);
+		  break;
 
-	  if (lidarDistance < 30)
-	  {
-		  HAL_Delay(5000);
-		  Smack();
+	  case SEARCH:
+		  // Looking for the skittles.
+		  break;
+
+	  case APPROACH:
+		  // Basic method to approach the skittle.
+		  // Potential upgrades needed to ensure car doesn't veer off.
+		  break;
+
+	  case COLOURCHECK:
+		  // Checking colour of object in front of car and moving to appropriate state.
+		  // No method of verifying there is something in front of the car
+		  break;
+
+	  case SMACK:
+		  // Hit the object over if it's been detected as a black skittle.
+		  break;
+
+	  case SHIMMY:
+		  // A three-point-turn manoeuvre that hopefully gets the car out of stuck spots /.
+		  // away from white skittles.
+		  break;
+
 	  }
+  }
+//	  lidarDistance = getLidarDistance();
+//	  irLeftDistance = getIrLeftDistance();
+//	  irRightDistance = getIrRightDistance();
+//
+//	  refreshAPDSData();
+//	  nearDistance = apdsDistance;
+//	  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
+//
+//	  //HAL_Delay(5000);  // Delay for 5 second
+//	  //Calibrate();
+//	  //HAL_Delay(5000);  // Delay for 5 second
+//	  //Straighten();
+//
+//	  if (lidarDistance < 30)
+//	  {
+//		  HAL_Delay(5000);
+//		  Smack();
+//	  }
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
 }
+  /* USER CODE END 3 */
 
 /**
   * @brief System Clock Configuration

@@ -128,16 +128,16 @@ int main(void) {
 
   // Preference of which wall to prefer assuming things go wrong.
   enum WALL_STATE{
-	LEFT,
-	RIGHT,
+	L,
+	R,
   };
 
-  int wall = LEFT;
+  int wall = L;
 
   // Possible states for the car to be in.
   enum MACHINE_STATES {
 	  MOVESIX,
-	  READJUST,
+	  READJUST_SIX,
 	  SEARCH,
 	  APPROACH,
 	  COLOURCHECK,
@@ -148,7 +148,25 @@ int main(void) {
   int state = MOVESIX;
 
   uint32_t start_time = HAL_GetTick();
+  uint32_t adjust_start_time = 0;
+  // Assuming 6 seconds is needed to travel the 6m.
+  uint32_t duration_ms = 1000000; // 6 seconds
+  uint32_t adjust_duration_ms = 1000;
 
+  enum DRIVE_DIRECTION {
+	  STOP,
+	  FORWARDS,
+	  SLOW_FORWARDS,
+	  BACKWARDS,
+  };
+  int prev_drive = STOP, drive = STOP;
+
+  enum WHEEL_DIRECTION {
+	  STRAIGHT,
+	  LEFT,
+	  RIGHT,
+  };
+  int prev_wheel = STRAIGHT, wheel = STRAIGHT;
 
   /* USER CODE END 2 */
 
@@ -163,20 +181,88 @@ int main(void) {
 
 	  // Moving 6 metres to approach the starting spot.
 	  case MOVESIX:
-		  //
-		  lidarDistance = getLidarDistance();
+		  TIM3->CCR4 = percentageToTIM3(0);
+		  // Checking if 6m worth of time has elapsed.
+		  if ((HAL_GetTick() - start_time) > duration_ms) {
 
-		  // Ternary statements stop the Ir sensors from reporting 0, and change those 0s to 999.
+			  // Move to next state
+			  state = SEARCH;
+
+			  // Reset current (just in case)
+			  drive = STOP;
+			  stopMotor();
+			  break;
+		  }
+
+		  lidarDistance = getLidarDistance();
+		  // Ensuring:
+		  // 1. There's more than 1s remaining, making sure the lidar doesn't pick up the skittle.
+		  // 2. The lidar sees something within 50cm, presumably (and hopefully) a wall.
+		  if ((HAL_GetTick() - start_time) < (duration_ms - 1000) && lidarDistance < 30) {
+			  // Adjust
+			  state = READJUST_SIX;
+			  adjust_start_time = HAL_GetTick();
+
+			  drive = SLOW_FORWARDS;
+			  if (prev_drive != drive) {
+				  prev_drive = drive;
+				  moveForwards(40);
+			  }
+			  break;
+		  }
+
+		  // If nothing wrong, ensure moving forwards
+		  drive = FORWARDS;
+		  if (prev_drive != drive) {
+			  prev_drive = drive;
+			  moveForwards(50);
+		  }
+
+		  break;
+
+	  // Readjusting the initial 6m approach.
+	  case READJUST_SIX:
+
+		  // Ternary statements stop the IR sensors from reporting 0, and change those 0s to 999.
+		  // The IR sensors still seem to fire off random readings at further distances, implementing some
+		  // sort of averaging would be good.
 		  irLeftDistance = (getIrLeftDistance() == 0) ? 999 : getIrLeftDistance();
 		  irRightDistance = (getIrRightDistance() == 0) ? 999 : getIrRightDistance();
 
-//		  // Some nifty code to reflect Ir sensor output on the LED.
-//		  if (irLeftDistance > irRightDistance){
-//			  TIM3->CCR4 = percentageToTIM3(100);
-//		  }
-//		  else {
-//			  TIM3->CCR4 = percentageToTIM3(0);
-// 		  }
+		  if (irLeftDistance > irRightDistance) {
+			  wheel = RIGHT;
+			  if (prev_wheel != wheel){
+				  prev_wheel = wheel;
+				  turnRight();
+			  }
+		  }
+
+		  else if (irLeftDistance < irRightDistance){
+			  wheel = LEFT;
+			  if (prev_wheel != wheel){
+				  prev_wheel = wheel;
+				  turnLeft();
+			  }
+		  }
+
+		  else{
+			  // Something is up / IRs not in range
+			  wheel = STRAIGHT;
+			  if (prev_wheel != wheel){
+				  prev_wheel = wheel;
+				  straighten();
+			  }
+		  }
+
+		  while ((HAL_GetTick() - adjust_start_time) < adjust_duration_ms) {}
+
+		  wheel = STRAIGHT;
+		  if (prev_wheel != wheel){
+			  prev_wheel = wheel;
+			  straighten();
+		  }
+
+		  state = MOVESIX;
 
 		  break;
 

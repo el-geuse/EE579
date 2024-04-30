@@ -117,7 +117,7 @@ int main(void) {
   sensorsAdcInit(&hadc1);
   sensorsI2CInit(&hi2c2);
   motorTimInit(&htim3);
-  SmackInit(&htim4);
+  smackInit(&htim4);
   initAPDS(&hi2c2);
   stopMotor();
 
@@ -126,8 +126,18 @@ int main(void) {
 
   uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
 
+  // Preference of which wall to prefer assuming things go wrong.
+  enum WALL_STATE{
+	LEFT,
+	RIGHT,
+  };
+
+  int wall = LEFT;
+
+  // Possible states for the car to be in.
   enum MACHINE_STATES {
 	  MOVESIX,
+	  READJUST,
 	  SEARCH,
 	  APPROACH,
 	  COLOURCHECK,
@@ -137,45 +147,61 @@ int main(void) {
 
   int state = MOVESIX;
 
+  uint32_t start_time = HAL_GetTick();
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  Calibrate();
+  calibrate();
 
   while (1) {
 	  // Beginning control loop
 	  switch (state) {
 
+	  // Moving 6 metres to approach the starting spot.
 	  case MOVESIX:
-		  // Moving 6 metres to approach the starting spot.
-//		  lidarDistance = getLidarDistance();
-//		  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
-		  moveForwards(40);
+		  //
+		  lidarDistance = getLidarDistance();
+
+		  // Ternary statements stop the Ir sensors from reporting 0, and change those 0s to 999.
+		  irLeftDistance = (getIrLeftDistance() == 0) ? 999 : getIrLeftDistance();
+		  irRightDistance = (getIrRightDistance() == 0) ? 999 : getIrRightDistance();
+
+//		  // Some nifty code to reflect Ir sensor output on the LED.
+//		  if (irLeftDistance > irRightDistance){
+//			  TIM3->CCR4 = percentageToTIM3(100);
+//		  }
+//		  else {
+//			  TIM3->CCR4 = percentageToTIM3(0);
+// 		  }
+
 		  break;
 
+	  // Looking for the skittles.
 	  case SEARCH:
-		  // Looking for the skittles.
+
 		  break;
 
+	  // Basic method to approach the skittle.
+	  // Potential upgrades needed to ensure car doesn't veer off.
 	  case APPROACH:
-		  // Basic method to approach the skittle.
-		  // Potential upgrades needed to ensure car doesn't veer off.
 		  break;
 
+	  // Checking colour of object in front of car and moving to appropriate state.
+	  // No method of verifying there is something in front of the car
 	  case COLOURCHECK:
-		  // Checking colour of object in front of car and moving to appropriate state.
-		  // No method of verifying there is something in front of the car
 		  break;
 
+	  // Hit the object over if it's been detected as a black skittle.
 	  case SMACK:
-		  // Hit the object over if it's been detected as a black skittle.
 		  break;
 
+	  // A three-point-turn manoeuvre that hopefully gets the car out of stuck spots /.
+	  // away from white skittles.
 	  case SHIMMY:
-		  // A three-point-turn manoeuvre that hopefully gets the car out of stuck spots /.
-		  // away from white skittles.
 		  break;
 
 	  }
@@ -189,14 +215,14 @@ int main(void) {
 //	  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
 //
 //	  //HAL_Delay(5000);  // Delay for 5 second
-//	  //Calibrate();
+//	  //calibrate();
 //	  //HAL_Delay(5000);  // Delay for 5 second
-//	  //Straighten();
+//	  //straighten();
 //
 //	  if (lidarDistance < 30)
 //	  {
 //		  HAL_Delay(5000);
-//		  Smack();
+//		  smack();
 //	  }
 
     /* USER CODE END WHILE */

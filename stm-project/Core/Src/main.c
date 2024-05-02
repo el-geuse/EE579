@@ -74,9 +74,11 @@ enum MACHINE_STATES {
 	  MOVESIX,
 	  READJUST_SIX,
 	  SEARCH,
-	  APPROACH,
+	  FAR_APPROACH,
+	  CLOSE_APPROACH,
 	  COLOURCHECK,
 	  SHIMMY,
+	  TEST,
 };
 
 enum DRIVE_DIRECTION {
@@ -145,7 +147,7 @@ int main(void) {
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2); //PA12 PA12 PA12 PA12
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
-  uint8_t lidarDistance, irLeftDistance, irRightDistance; //, nearDistance;
+  uint16_t lidarDistance, irLeftDistance, irRightDistance;
 
   // Preference of which wall to prefer assuming things go wrong.
   enum WALL_STATE{
@@ -155,13 +157,13 @@ int main(void) {
 
   enum WALL_STATE wall = L;
 
-  enum MACHINE_STATES state = COLOURCHECK;
+  enum MACHINE_STATES state = SHIMMY;
 
   uint32_t start_time = HAL_GetTick();
   uint32_t adjust_start_time;
   // Assuming 6 seconds is needed to travel the 6m.
-  uint32_t duration_ms = 6000; // 6 seconds
-  uint32_t adjust_duration_ms = 500;
+  uint32_t duration_ms = 2000; // 6 seconds
+  uint32_t adjust_duration_ms = 200;
 
 
   enum DRIVE_DIRECTION prev_move = STOP;
@@ -192,7 +194,7 @@ int main(void) {
 		  // Ensuring:
 		  // 1. There's more than 1s remaining, making sure the lidar doesn't pick up the skittle.
 		  // 2. The lidar sees something within 50cm, presumably (and hopefully) a wall.
-		  if ((HAL_GetTick() - start_time) < (duration_ms - 1000) && lidarDistance < 30) {
+		  if (((HAL_GetTick() - start_time) < (duration_ms - 1000)) && lidarDistance < 50) {
 			  // Adjust
 			  state = READJUST_SIX;
 			  adjust_start_time = HAL_GetTick();
@@ -233,7 +235,7 @@ int main(void) {
 		  while ((HAL_GetTick() - adjust_start_time) < adjust_duration_ms) {}
 
 		  // Update forward duration with the readjustment
-		  duration_ms = duration_ms + adjust_duration_ms;
+		  // duration_ms = duration_ms + adjust_duration_ms;
 
 		  turn(STRAIGHT, &prev_turn);
 		  state = MOVESIX;
@@ -244,8 +246,8 @@ int main(void) {
 	  case SEARCH:
 		  lidarDistance = getLidarDistance();
 
-		  if (lidarDistance < 1) {
-			  state = APPROACH;
+		  if (lidarDistance < 60) {
+			  state = FAR_APPROACH;
 			  break;
 		  }
 
@@ -263,14 +265,18 @@ int main(void) {
 
 	  // Basic method to approach the skittle.
 	  // Potential upgrades needed to ensure car doesn't veer off.
-	  case APPROACH:
+	  case FAR_APPROACH:
 		  lidarDistance = getLidarDistance();
 
-		  if (lidarDistance < 5) {
-			  state = COLOURCHECK;
-			  turn(STRAIGHT, &prev_turn);
-			  move(STOP, &prev_move);
-			  break;
+		  if (lidarDistance < 15) {
+			  refreshAPDSData();
+			  // Double checks the lidar reading with the apds sensor
+			  if (apdsDistance > 8) {
+				  state = COLOURCHECK;
+				  turn(STRAIGHT, &prev_turn);
+				  move(STOP, &prev_move);
+				  break;
+			  }
 		  }
 
 		  // Else, keep moving
@@ -284,13 +290,14 @@ int main(void) {
 	  // No method of verifying there is something in front of the car (except maybe with the apds?)
 	  case COLOURCHECK:
 		  TIM3->CCR4 = percentageToTIM3(100);
-		  HAL_Delay(500);
+		  HAL_Delay(200);
 
 		  // Check colour data
 		  refreshAPDSData();
 
-		  if ((red < 140) && (green < 100) && (blue < 100)) {smack();}
+		  if ((red < 200) && (green < 100) && (blue < 100)) {smack();}
 
+		  TIM3->CCR4 = percentageToTIM3(0);
 		  state = SHIMMY;
 
 		  break;
@@ -299,7 +306,36 @@ int main(void) {
 	  // A three-point-turn manoeuvre that hopefully gets the car out of stuck spots /.
 	  // away from white skittles.
 	  case SHIMMY:
-		  TIM3->CCR4 = percentageToTIM3(0);
+
+		  if (wall == L) {
+			  // Means the right wall has just been hit
+			  turn(RIGHT, &prev_turn);
+			  HAL_Delay(300);
+			  move(SLOW_BACKWARDS, &prev_move);
+		  } else {
+			  // Same but for left wall
+			  turn(LEFT, &prev_turn);
+			  HAL_Delay(300);
+			  move(SLOW_BACKWARDS, &prev_move);
+		  }
+
+		  HAL_Delay(3000);
+
+		  move(STOP, &prev_move);
+		  turn(STRAIGHT, &prev_turn);
+
+		  HAL_Delay(1000);
+		  // Switching sides
+		  wall = 1 - wall;
+		  state = SHIMMY;
+		  break;
+
+
+	  case TEST:
+		  turn(LEFT, &prev_turn);
+		  HAL_Delay(2000);
+		  turn(RIGHT, &prev_turn);
+		  HAL_Delay(2000);
 		  break;
 	  }
   }
@@ -329,6 +365,7 @@ int main(void) {
 void turn(enum WHEEL_DIRECTION turn_dir, enum WHEEL_DIRECTION *prev_turn) {
     if (*prev_turn != turn_dir) {
         *prev_turn = turn_dir;
+
         switch (turn_dir) {
         case LEFT:
         	turnLeft();
@@ -352,16 +389,16 @@ void move(enum DRIVE_DIRECTION move_dir, enum DRIVE_DIRECTION *prev_move) {
 			stopMotor();
 			break;
 		case FORWARDS:
-			moveForwards(50);
+			moveForwards(60);
 			break;
 		case SLOW_FORWARDS:
-			moveForwards(40);
+			moveForwards(50);
 			break;
 		case BACKWARDS:
-			moveBackwards(50);
+			moveBackwards(60);
 			break;
 		case SLOW_BACKWARDS:
-			moveBackwards(40);
+			moveBackwards(50);
 			break;
 		}
 	}

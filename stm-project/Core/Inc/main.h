@@ -55,7 +55,12 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+enum MACHINE_STATES;
+enum DRIVE_DIRECTION;
+enum WHEEL_DIRECTION;
 
+void turn(enum WHEEL_DIRECTION turn_dir, enum WHEEL_DIRECTION *prev_turn);
+void move(enum DRIVE_DIRECTION move_dir, enum DRIVE_DIRECTION *prev_move);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

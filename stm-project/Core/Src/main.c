@@ -69,6 +69,29 @@ static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
+// Possible states for the car to be in.
+enum MACHINE_STATES {
+	  MOVESIX,
+	  READJUST_SIX,
+	  SEARCH,
+	  APPROACH,
+	  COLOURCHECK,
+	  SHIMMY,
+};
+
+enum DRIVE_DIRECTION {
+	  STOP,
+	  FORWARDS,
+	  SLOW_FORWARDS,
+	  BACKWARDS,
+	  SLOW_BACKWARDS,
+};
+
+enum WHEEL_DIRECTION {
+	  STRAIGHT,
+	  LEFT,
+	  RIGHT,
+};
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -112,8 +135,6 @@ int main(void) {
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
-
-
   sensorsAdcInit(&hadc1);
   sensorsI2CInit(&hi2c2);
   motorTimInit(&htim3);
@@ -124,7 +145,7 @@ int main(void) {
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2); //PA12 PA12 PA12 PA12
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
-  uint8_t lidarDistance, irLeftDistance, irRightDistance, nearDistance;
+  uint8_t lidarDistance, irLeftDistance, irRightDistance; //, nearDistance;
 
   // Preference of which wall to prefer assuming things go wrong.
   enum WALL_STATE{
@@ -132,41 +153,19 @@ int main(void) {
 	R,
   };
 
-  int wall = L;
+  enum WALL_STATE wall = L;
 
-  // Possible states for the car to be in.
-  enum MACHINE_STATES {
-	  MOVESIX,
-	  READJUST_SIX,
-	  SEARCH,
-	  APPROACH,
-	  COLOURCHECK,
-	  SMACK,
-	  SHIMMY,
-  };
-
-  int state = MOVESIX;
+  enum MACHINE_STATES state = COLOURCHECK;
 
   uint32_t start_time = HAL_GetTick();
-  uint32_t adjust_start_time = 0;
+  uint32_t adjust_start_time;
   // Assuming 6 seconds is needed to travel the 6m.
-  uint32_t duration_ms = 1000000; // 6 seconds
-  uint32_t adjust_duration_ms = 1000;
+  uint32_t duration_ms = 6000; // 6 seconds
+  uint32_t adjust_duration_ms = 500;
 
-  enum DRIVE_DIRECTION {
-	  STOP,
-	  FORWARDS,
-	  SLOW_FORWARDS,
-	  BACKWARDS,
-  };
-  int prev_drive = STOP, drive = STOP;
 
-  enum WHEEL_DIRECTION {
-	  STRAIGHT,
-	  LEFT,
-	  RIGHT,
-  };
-  int prev_wheel = STRAIGHT, wheel = STRAIGHT;
+  enum DRIVE_DIRECTION prev_move = STOP;
+  enum WHEEL_DIRECTION prev_turn = STRAIGHT;
 
   /* USER CODE END 2 */
 
@@ -179,18 +178,13 @@ int main(void) {
 	  // Beginning control loop
 	  switch (state) {
 
+
 	  // Moving 6 metres to approach the starting spot.
 	  case MOVESIX:
-		  TIM3->CCR4 = percentageToTIM3(0);
 		  // Checking if 6m worth of time has elapsed.
 		  if ((HAL_GetTick() - start_time) > duration_ms) {
-
 			  // Move to next state
 			  state = SEARCH;
-
-			  // Reset current (just in case)
-			  drive = STOP;
-			  stopMotor();
 			  break;
 		  }
 
@@ -203,22 +197,15 @@ int main(void) {
 			  state = READJUST_SIX;
 			  adjust_start_time = HAL_GetTick();
 
-			  drive = SLOW_FORWARDS;
-			  if (prev_drive != drive) {
-				  prev_drive = drive;
-				  moveForwards(40);
-			  }
+			  move(SLOW_FORWARDS, &prev_move);
 			  break;
 		  }
 
 		  // If nothing wrong, ensure moving forwards
-		  drive = FORWARDS;
-		  if (prev_drive != drive) {
-			  prev_drive = drive;
-			  moveForwards(50);
-		  }
+		  move(FORWARDS, &prev_move);
 
 		  break;
+
 
 	  // Readjusting the initial 6m approach.
 	  case READJUST_SIX:
@@ -226,70 +213,94 @@ int main(void) {
 		  // Ternary statements stop the IR sensors from reporting 0, and change those 0s to 999.
 		  // The IR sensors still seem to fire off random readings at further distances, implementing some
 		  // sort of averaging would be good.
+		  // LEFT AND RIGHT ARE THE WRONG WAY ROUND.
 		  irLeftDistance = (getIrLeftDistance() == 0) ? 999 : getIrLeftDistance();
 		  irRightDistance = (getIrRightDistance() == 0) ? 999 : getIrRightDistance();
 
 		  if (irLeftDistance > irRightDistance) {
-			  wheel = RIGHT;
-			  if (prev_wheel != wheel){
-				  prev_wheel = wheel;
-				  turnRight();
-			  }
+			  turn(RIGHT, &prev_turn);
 		  }
 
 		  else if (irLeftDistance < irRightDistance){
-			  wheel = LEFT;
-			  if (prev_wheel != wheel){
-				  prev_wheel = wheel;
-				  turnLeft();
-			  }
+			  turn(LEFT, &prev_turn);
 		  }
 
 		  else{
 			  // Something is up / IRs not in range
-			  wheel = STRAIGHT;
-			  if (prev_wheel != wheel){
-				  prev_wheel = wheel;
-				  straighten();
-			  }
+			  turn(STRAIGHT, &prev_turn);
 		  }
 
 		  while ((HAL_GetTick() - adjust_start_time) < adjust_duration_ms) {}
 
-		  wheel = STRAIGHT;
-		  if (prev_wheel != wheel){
-			  prev_wheel = wheel;
-			  straighten();
+		  // Update forward duration with the readjustment
+		  duration_ms = duration_ms + adjust_duration_ms;
+
+		  turn(STRAIGHT, &prev_turn);
+		  state = MOVESIX;
+		  break;
+
+
+	  // Looking for the skittles. Following a curve to hopefully find them.
+	  case SEARCH:
+		  lidarDistance = getLidarDistance();
+
+		  if (lidarDistance < 1) {
+			  state = APPROACH;
+			  break;
 		  }
 
-		  state = MOVESIX;
+		  // if nothing in view (taking into account the side we're on)
+		  if (wall == L) {
+			  turn(RIGHT, &prev_turn);
+			  move(SLOW_FORWARDS, &prev_move);
+		  } else {
+			  turn(LEFT, &prev_turn);
+			  move(SLOW_FORWARDS, &prev_move);
+		  }
 
 		  break;
 
-	  // Looking for the skittles.
-	  case SEARCH:
-
-		  break;
 
 	  // Basic method to approach the skittle.
 	  // Potential upgrades needed to ensure car doesn't veer off.
 	  case APPROACH:
+		  lidarDistance = getLidarDistance();
+
+		  if (lidarDistance < 5) {
+			  state = COLOURCHECK;
+			  turn(STRAIGHT, &prev_turn);
+			  move(STOP, &prev_move);
+			  break;
+		  }
+
+		  // Else, keep moving
+		  turn(STRAIGHT, &prev_turn);
+		  move(SLOW_FORWARDS, &prev_move);
+
 		  break;
+
 
 	  // Checking colour of object in front of car and moving to appropriate state.
-	  // No method of verifying there is something in front of the car
+	  // No method of verifying there is something in front of the car (except maybe with the apds?)
 	  case COLOURCHECK:
+		  TIM3->CCR4 = percentageToTIM3(100);
+		  HAL_Delay(500);
+
+		  // Check colour data
+		  refreshAPDSData();
+
+		  if ((red < 140) && (green < 100) && (blue < 100)) {smack();}
+
+		  state = SHIMMY;
+
 		  break;
 
-	  // Hit the object over if it's been detected as a black skittle.
-	  case SMACK:
-		  break;
 
 	  // A three-point-turn manoeuvre that hopefully gets the car out of stuck spots /.
 	  // away from white skittles.
 	  case SHIMMY:
+		  TIM3->CCR4 = percentageToTIM3(0);
 		  break;
-
 	  }
   }
 //	  lidarDistance = getLidarDistance();
@@ -310,10 +321,50 @@ int main(void) {
 //		  HAL_Delay(5000);
 //		  smack();
 //	  }
-
+}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+// Checks previous and issued command, to not have constant sending of turning commands.
+void turn(enum WHEEL_DIRECTION turn_dir, enum WHEEL_DIRECTION *prev_turn) {
+    if (*prev_turn != turn_dir) {
+        *prev_turn = turn_dir;
+        switch (turn_dir) {
+        case LEFT:
+        	turnLeft();
+        	break;
+        case RIGHT:
+        	turnRight();
+        	break;
+        case STRAIGHT:
+        	straighten();
+        	break;
+        }
+    }
+}
+
+// As above but for movement.
+void move(enum DRIVE_DIRECTION move_dir, enum DRIVE_DIRECTION *prev_move) {
+	if (*prev_move != move_dir) {
+		*prev_move = move_dir;
+		switch(move_dir) {
+		case STOP:
+			stopMotor();
+			break;
+		case FORWARDS:
+			moveForwards(50);
+			break;
+		case SLOW_FORWARDS:
+			moveForwards(40);
+			break;
+		case BACKWARDS:
+			moveBackwards(50);
+			break;
+		case SLOW_BACKWARDS:
+			moveBackwards(40);
+			break;
+		}
+	}
 }
   /* USER CODE END 3 */
 

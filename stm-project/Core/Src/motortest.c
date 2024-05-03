@@ -12,11 +12,12 @@ void motorTimInit(TIM_HandleTypeDef *htim)
 	stopMotor();
 }
 
-void SmackInit(TIM_HandleTypeDef *htim)
+void smackInit(TIM_HandleTypeDef *htim)
 {
-	TIM4->CCR2 = 1000;
+	TIM4->CCR2 = 500;
 	HAL_TIM_PWM_Start(htimSmack, TIM_CHANNEL_2);
 	htimSmack = htim;
+	TIM4->CCR2 = 0;
 }
 
 void moveBackwards(uint8_t speedPercent) {
@@ -39,7 +40,7 @@ void stopMotor() {
     TIM3->CCR2 = 0; // Stop channel 2 by setting duty cycle to 0
 }
 
-void Calibrate(){
+void calibrate(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
     HAL_Delay(500);
@@ -48,29 +49,30 @@ void Calibrate(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
 }
 
-void Straighten(){
+void straighten(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
 
 }
 
-void TurnLeft(){
+void turnLeft(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
 
 }
 
-void TurnRight(){
+void turnRight(){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 
 }
 
-void Smack(){
+void smack(){
 	TIM4->CCR2 = 2500;
     HAL_Delay(2000);
     TIM4->CCR2 = 500;
-    HAL_Delay(4000);
+    HAL_Delay(2000);
+    TIM4->CCR2 = 0;
 }
 
 

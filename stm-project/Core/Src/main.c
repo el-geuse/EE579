@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include "sensors.h"
 #include "motortest.h"
+#include <stdlib.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -147,7 +149,7 @@ int main(void) {
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2); //PA12 PA12 PA12 PA12
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
-  uint16_t lidarDistance, irLeftDistance, irRightDistance;
+  uint16_t lidarDistance, irLeftDistance, irRightDistance, prevLidarDistance = 0;
 
   // Preference of which wall to prefer assuming things go wrong.
   enum WALL_STATE{
@@ -156,14 +158,18 @@ int main(void) {
   };
 
   enum WALL_STATE wall = L;
+  enum WALL_STATE snaking_flag = L;
 
-  enum MACHINE_STATES state = SHIMMY;
+  enum MACHINE_STATES state = TEST;
 
   uint32_t start_time = HAL_GetTick();
   uint32_t adjust_start_time;
   // Assuming 6 seconds is needed to travel the 6m.
-  uint32_t duration_ms = 2000; // 6 seconds
+  uint32_t duration_ms = 5000; // 6 seconds
   uint32_t adjust_duration_ms = 200;
+
+  int hold_flag = 0;
+  int left_ir_flag, right_ir_flag;
 
 
   enum DRIVE_DIRECTION prev_move = STOP;
@@ -175,10 +181,12 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
 
   calibrate();
+//  TIM3->CCR4 = percentageToTIM3(100);
 
   while (1) {
 	  // Beginning control loop
 	  switch (state) {
+
 
 
 	  // Moving 6 metres to approach the starting spot.
@@ -209,6 +217,7 @@ int main(void) {
 		  break;
 
 
+
 	  // Readjusting the initial 6m approach.
 	  case READJUST_SIX:
 
@@ -216,8 +225,8 @@ int main(void) {
 		  // The IR sensors still seem to fire off random readings at further distances, implementing some
 		  // sort of averaging would be good.
 		  // LEFT AND RIGHT ARE THE WRONG WAY ROUND.
-		  irLeftDistance = (getIrLeftDistance() == 0) ? 999 : getIrLeftDistance();
-		  irRightDistance = (getIrRightDistance() == 0) ? 999 : getIrRightDistance();
+		  irLeftDistance = getIrLeftDistance();
+		  irRightDistance = getIrRightDistance();
 
 		  if (irLeftDistance > irRightDistance) {
 			  turn(RIGHT, &prev_turn);
@@ -242,11 +251,12 @@ int main(void) {
 		  break;
 
 
+
 	  // Looking for the skittles. Following a curve to hopefully find them.
 	  case SEARCH:
 		  lidarDistance = getLidarDistance();
 
-		  if (lidarDistance < 60) {
+		  if (lidarDistance < 100) {
 			  state = FAR_APPROACH;
 			  break;
 		  }
@@ -263,27 +273,114 @@ int main(void) {
 		  break;
 
 
+
 	  // Basic method to approach the skittle.
 	  // Potential upgrades needed to ensure car doesn't veer off.
 	  case FAR_APPROACH:
 		  lidarDistance = getLidarDistance();
 
-		  if (lidarDistance < 15) {
+		  // When the skittle is close enough.
+		  if (lidarDistance < 40) {
+			  state = CLOSE_APPROACH;
+			  turn(STRAIGHT, &prev_turn);
+			  move(STOP, &prev_move);
+
+			  // Resetting state.
+			  hold_flag = 0;
+			  prevLidarDistance = 0;
+			  break;
+		  }
+
+		  // Ensuring no break
+		  if (prevLidarDistance == 0) {prevLidarDistance = lidarDistance;}
+
+		  // A short check to ensure the object hasn't been lost / things move too fast.
+		  if (lidarDistance < prevLidarDistance) {prevLidarDistance = lidarDistance;}
+
+		  // Starting snaking
+		  if (snaking_flag == L){
+			  // Checking to see if the snaking has passed the left side of skittle.
+			  if (abs(prevLidarDistance - lidarDistance) > 15) {
+				  if (!hold_flag) {
+					  // Car has passed the skittle.
+					  hold_flag = 1;
+					  snaking_flag = R;
+//					  TIM3->CCR4 = percentageToTIM3(0);
+				  }
+			  } else {
+				  if (hold_flag) {
+					  // Car is back on track
+					  hold_flag = 0;
+//					  TIM3->CCR4 = percentageToTIM3(100);
+				  }
+				  // Update previous distance only if not holding.
+				  // This keeps a memory of the last skittle location
+				  prevLidarDistance = hold_flag ? prevLidarDistance : lidarDistance;
+			  }
+
+			  turn(LEFT, &prev_turn);
+			  move(SLOW_FORWARDS, &prev_move);
+
+		  } else {
+			  // Checking to see if the snaking has passed the left side of skittle.
+			  if (abs(prevLidarDistance - lidarDistance) > 15) {
+				  if (!hold_flag) {
+					  // Car has passed the skittle.
+					  hold_flag = 1;
+					  snaking_flag = L;
+//					  TIM3->CCR4 = percentageToTIM3(0);
+				  }
+			  } else {
+				  if (hold_flag) {
+					  // Car is back on track
+					  hold_flag = 0;
+//					  TIM3->CCR4 = percentageToTIM3(100);
+				  }
+				  // Update previous distance only if not holding.
+				  // This keeps a memory of the last skittle location
+				  prevLidarDistance = hold_flag ? prevLidarDistance : lidarDistance;
+			  }
+
+			  turn(RIGHT, &prev_turn);
+			  move(SLOW_FORWARDS, &prev_move);
+		  }
+
+		  break;
+
+
+
+	  // Approach using the ir sensors to help out as well.
+	  // REMINDER LEFT AND RIGHT ARE WRONG WAY ROUND.
+	  case CLOSE_APPROACH:
+
+		  lidarDistance = getLidarDistance();
+
+		  // When the skittle is close enough.
+		  if (lidarDistance < 10) {
 			  refreshAPDSData();
-			  // Double checks the lidar reading with the apds sensor
-			  if (apdsDistance > 8) {
-				  state = COLOURCHECK;
+			  if (apdsDistance > 8){
+				  state = TEST;
 				  turn(STRAIGHT, &prev_turn);
 				  move(STOP, &prev_move);
 				  break;
 			  }
 		  }
 
-		  // Else, keep moving
-		  turn(STRAIGHT, &prev_turn);
 		  move(SLOW_FORWARDS, &prev_move);
 
-		  break;
+		  irLeftDistance = getIrLeftDistance();
+		  irRightDistance = getIrRightDistance();
+
+		  left_ir_flag = (irLeftDistance < 100) ? 1 : 0;
+		  right_ir_flag = (irRightDistance  < 100) ? 1 : 0;
+
+		  // remember they are opposite.
+		  if (left_ir_flag && !right_ir_flag) {turn(RIGHT, &prev_turn);TIM3->CCR4 = percentageToTIM3(100);}
+		  if (!left_ir_flag && right_ir_flag) {turn(LEFT, &prev_turn);TIM3->CCR4 = percentageToTIM3(0);}
+		  if (!left_ir_flag && !right_ir_flag) {turn(STRAIGHT, &prev_turn);}
+		  if (left_ir_flag && right_ir_flag) {turn(STRAIGHT, &prev_turn);}
+	  	  break;
+
 
 
 	  // Checking colour of object in front of car and moving to appropriate state.
@@ -301,6 +398,7 @@ int main(void) {
 		  state = SHIMMY;
 
 		  break;
+
 
 
 	  // A three-point-turn manoeuvre that hopefully gets the car out of stuck spots /.
@@ -327,16 +425,17 @@ int main(void) {
 		  HAL_Delay(1000);
 		  // Switching sides
 		  wall = 1 - wall;
-		  state = SHIMMY;
+		  state = SEARCH;
 		  break;
+
 
 
 	  case TEST:
-		  turn(LEFT, &prev_turn);
-		  HAL_Delay(2000);
-		  turn(RIGHT, &prev_turn);
-		  HAL_Delay(2000);
+		  move(SLOW_FORWARDS, &prev_move);
 		  break;
+
+
+
 	  }
   }
 //	  lidarDistance = getLidarDistance();
@@ -389,16 +488,16 @@ void move(enum DRIVE_DIRECTION move_dir, enum DRIVE_DIRECTION *prev_move) {
 			stopMotor();
 			break;
 		case FORWARDS:
-			moveForwards(60);
+			moveForwards(55);
 			break;
 		case SLOW_FORWARDS:
-			moveForwards(50);
+			moveForwards(30);
 			break;
 		case BACKWARDS:
-			moveBackwards(60);
+			moveBackwards(55);
 			break;
 		case SLOW_BACKWARDS:
-			moveBackwards(50);
+			moveBackwards(45);
 			break;
 		}
 	}
@@ -733,7 +832,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 169;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 500;
+  htim3.Init.Period = 1000;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)

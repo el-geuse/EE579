@@ -55,8 +55,10 @@ uint16_t getLidarDistance()
 	if (comError == 0) {
 		distance = (receive[1] << 8) | receive[0];
 	} else {
-		distance = 0;
+		// Changed default to not be annoying.
+		distance = 999;
 	}
+	distance = !distance ? 999 : distance;
 
 	return distance;
 }
@@ -124,6 +126,7 @@ uint16_t getIrLeftDistance()
 #ifdef leftIR_GP2Y0A02YK0F
 	distance = interp(lut_GP2Y0A02YK0F, (float)voltage*3.3/4096, 15);
 #endif
+	distance = !distance ? 999 : distance;
 	return distance;
 }
 uint16_t getIrRightDistance()
@@ -143,8 +146,7 @@ uint16_t getIrRightDistance()
 #ifdef rightIR_GP2Y0A02YK0F
 	distance = interp(lut_GP2Y0A02YK0F, (float)voltage*3.3/4096, 15);
 #endif
-
-
+	distance = !distance ? 999 : distance;
 	return distance;
 
 }

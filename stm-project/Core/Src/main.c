@@ -160,16 +160,22 @@ int main(void) {
   enum WALL_STATE wall = L;
   enum WALL_STATE snaking_flag = L;
 
-  enum MACHINE_STATES state = TEST;
+  enum MACHINE_STATES state = MOVESIX;
 
   uint32_t start_time = HAL_GetTick();
   uint32_t adjust_start_time;
   // Assuming 6 seconds is needed to travel the 6m.
-  uint32_t duration_ms = 5000; // 6 seconds
-  uint32_t adjust_duration_ms = 200;
+  uint32_t duration_ms = 8000; // 6 seconds
+  uint32_t adjust_duration_ms = 100;
+  uint32_t turn_time = 0;
+  uint32_t max_turn = 800; // max turning time during approach of 0.5s.
+  uint32_t forward_time = 0;
+  uint32_t forward_time2 = 0;
 
   int hold_flag = 0;
   int left_ir_flag, right_ir_flag;
+  int close_approach_timeout = 0;
+
 
 
   enum DRIVE_DIRECTION prev_move = STOP;
@@ -180,7 +186,7 @@ int main(void) {
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  calibrate();
+//  calibrate();
 //  TIM3->CCR4 = percentageToTIM3(100);
 
   while (1) {
@@ -194,25 +200,41 @@ int main(void) {
 		  // Checking if 6m worth of time has elapsed.
 		  if ((HAL_GetTick() - start_time) > duration_ms) {
 			  // Move to next state
+			  forward_time = HAL_GetTick();
+			  forward_time2 = HAL_GetTick();
 			  state = SEARCH;
 			  break;
 		  }
 
-		  lidarDistance = getLidarDistance();
-		  // Ensuring:
-		  // 1. There's more than 1s remaining, making sure the lidar doesn't pick up the skittle.
-		  // 2. The lidar sees something within 50cm, presumably (and hopefully) a wall.
-		  if (((HAL_GetTick() - start_time) < (duration_ms - 1000)) && lidarDistance < 50) {
-			  // Adjust
-			  state = READJUST_SIX;
-			  adjust_start_time = HAL_GetTick();
-
-			  move(SLOW_FORWARDS, &prev_move);
-			  break;
-		  }
-
+//		  lidarDistance = getLidarDistance();
+//		  // Ensuring:
+//		  // 1. There's more than 1s remaining, making sure the lidar doesn't pick up the skittle.
+//		  // 2. The lidar sees something within 50cm, presumably (and hopefully) a wall.
+//		  if (((HAL_GetTick() - start_time) < (duration_ms - 1000)) && lidarDistance < 100) {
+//			  // Adjust
+//			  state = READJUST_SIX;
+//			  adjust_start_time = HAL_GetTick();
+//
+//			  move(SLOW_FORWARDS, &prev_move);
+//			  break;
+//		  }
+//
 		  // If nothing wrong, ensure moving forwards
 		  move(FORWARDS, &prev_move);
+
+		  if (wall == L) {
+			  turn(LEFT, &prev_turn);
+			  HAL_Delay(120);
+			  turn(RIGHT, &prev_turn);
+			  HAL_Delay(80);
+		  } else {
+			  turn(RIGHT, &prev_turn);
+			  HAL_Delay(80);
+			  turn(LEFT, &prev_turn);
+			  HAL_Delay(120);
+		  }
+
+
 
 		  break;
 
@@ -256,20 +278,45 @@ int main(void) {
 	  case SEARCH:
 		  lidarDistance = getLidarDistance();
 
-		  if (lidarDistance < 100) {
+		  if (lidarDistance < 220) {
 			  state = FAR_APPROACH;
+			  turn(STRAIGHT, &prev_turn);
+			  move(STOP, &prev_move);
+
+			  turn_time = HAL_GetTick();
+
 			  break;
 		  }
 
-		  // if nothing in view (taking into account the side we're on)
-		  if (wall == L) {
-			  turn(RIGHT, &prev_turn);
+		  if ((HAL_GetTick() - forward_time) < 2000) {
+			  // Moving forward first
 			  move(SLOW_FORWARDS, &prev_move);
-		  } else {
-			  turn(LEFT, &prev_turn);
-			  move(SLOW_FORWARDS, &prev_move);
-		  }
+			  if (wall == L) {
+				  if ((HAL_GetTick() - forward_time2) < 120) {
+					  turn(LEFT, &prev_turn);
+				  } else if ((HAL_GetTick() - forward_time2) < 200){
+					  turn(RIGHT, &prev_turn);
+				  } else { forward_time2 = HAL_GetTick();}
+			  } else {
+				  if ((HAL_GetTick() - forward_time2) < 80) {
+					  turn(RIGHT, &prev_turn);
+				  } else if ((HAL_GetTick() - forward_time2) < 200){
+					  turn(LEFT, &prev_turn);
+				  } else { forward_time2 = HAL_GetTick();}
+			  }
 
+
+
+		  } else {
+			  // if nothing in view (taking into account the side we're on)
+			  if (wall == L) {
+				  turn(RIGHT, &prev_turn);
+				  move(SLOW_FORWARDS, &prev_move);
+			  } else {
+				  turn(LEFT, &prev_turn);
+				  move(SLOW_FORWARDS, &prev_move);
+			  }
+		  }
 		  break;
 
 
@@ -284,11 +331,19 @@ int main(void) {
 			  state = CLOSE_APPROACH;
 			  turn(STRAIGHT, &prev_turn);
 			  move(STOP, &prev_move);
+			  forward_time2 = HAL_GetTick();
 
 			  // Resetting state.
 			  hold_flag = 0;
 			  prevLidarDistance = 0;
+			  turn_time = 0;
 			  break;
+		  }
+
+		  // Checking that it hasn't been turning for too long
+		  if ((HAL_GetTick() - turn_time) > max_turn) {
+			  snaking_flag = 1 - snaking_flag;
+			  turn_time = HAL_GetTick();
 		  }
 
 		  // Ensuring no break
@@ -299,12 +354,14 @@ int main(void) {
 
 		  // Starting snaking
 		  if (snaking_flag == L){
+//			  TIM3->CCR4 = percentageToTIM3(0);
 			  // Checking to see if the snaking has passed the left side of skittle.
 			  if (abs(prevLidarDistance - lidarDistance) > 15) {
 				  if (!hold_flag) {
 					  // Car has passed the skittle.
 					  hold_flag = 1;
 					  snaking_flag = R;
+					  turn_time = HAL_GetTick();
 //					  TIM3->CCR4 = percentageToTIM3(0);
 				  }
 			  } else {
@@ -322,12 +379,14 @@ int main(void) {
 			  move(SLOW_FORWARDS, &prev_move);
 
 		  } else {
+//			  TIM3->CCR4 = percentageToTIM3(100);
 			  // Checking to see if the snaking has passed the left side of skittle.
 			  if (abs(prevLidarDistance - lidarDistance) > 15) {
 				  if (!hold_flag) {
 					  // Car has passed the skittle.
 					  hold_flag = 1;
 					  snaking_flag = L;
+					  turn_time = HAL_GetTick();
 //					  TIM3->CCR4 = percentageToTIM3(0);
 				  }
 			  } else {
@@ -359,7 +418,7 @@ int main(void) {
 		  if (lidarDistance < 10) {
 			  refreshAPDSData();
 			  if (apdsDistance > 8){
-				  state = TEST;
+				  state = COLOURCHECK;
 				  turn(STRAIGHT, &prev_turn);
 				  move(STOP, &prev_move);
 				  break;
@@ -371,14 +430,34 @@ int main(void) {
 		  irLeftDistance = getIrLeftDistance();
 		  irRightDistance = getIrRightDistance();
 
-		  left_ir_flag = (irLeftDistance < 100) ? 1 : 0;
-		  right_ir_flag = (irRightDistance  < 100) ? 1 : 0;
+		  left_ir_flag = (irLeftDistance < 110) ? 1 : 0;
+		  right_ir_flag = (irRightDistance  < 110) ? 1 : 0;
+
 
 		  // remember they are opposite.
-		  if (left_ir_flag && !right_ir_flag) {turn(RIGHT, &prev_turn);TIM3->CCR4 = percentageToTIM3(100);}
-		  if (!left_ir_flag && right_ir_flag) {turn(LEFT, &prev_turn);TIM3->CCR4 = percentageToTIM3(0);}
-		  if (!left_ir_flag && !right_ir_flag) {turn(STRAIGHT, &prev_turn);}
-		  if (left_ir_flag && right_ir_flag) {turn(STRAIGHT, &prev_turn);}
+		  if (left_ir_flag && !right_ir_flag) {
+			  if (close_approach_timeout++ == 3) {
+				  close_approach_timeout = 0;
+				  // Mitiagation as slight right drift.
+				  turn(LEFT, &prev_turn);
+			  } else {turn(RIGHT, &prev_turn);}
+		  }
+		  else if (!left_ir_flag && right_ir_flag) {turn(LEFT, &prev_turn);}
+		  else {
+			  if (wall == L) {
+				  if ((HAL_GetTick() - forward_time2) < 120) {
+					  turn(LEFT, &prev_turn);
+				  } else if ((HAL_GetTick() - forward_time2) < 200){
+					  turn(RIGHT, &prev_turn);
+				  } else { forward_time2 = HAL_GetTick();}
+			  } else {
+				  if ((HAL_GetTick() - forward_time2) < 80) {
+					  turn(RIGHT, &prev_turn);
+				  } else if ((HAL_GetTick() - forward_time2) < 200){
+					  turn(LEFT, &prev_turn);
+				  } else { forward_time2 = HAL_GetTick();}
+			  }
+		  }
 	  	  break;
 
 
@@ -387,7 +466,7 @@ int main(void) {
 	  // No method of verifying there is something in front of the car (except maybe with the apds?)
 	  case COLOURCHECK:
 		  TIM3->CCR4 = percentageToTIM3(100);
-		  HAL_Delay(200);
+		  HAL_Delay(500);
 
 		  // Check colour data
 		  refreshAPDSData();
@@ -408,21 +487,20 @@ int main(void) {
 		  if (wall == L) {
 			  // Means the right wall has just been hit
 			  turn(RIGHT, &prev_turn);
-			  HAL_Delay(300);
-			  move(SLOW_BACKWARDS, &prev_move);
+			  HAL_Delay(200);
+			  move(BACKWARDS, &prev_move);
 		  } else {
 			  // Same but for left wall
 			  turn(LEFT, &prev_turn);
-			  HAL_Delay(300);
-			  move(SLOW_BACKWARDS, &prev_move);
+			  HAL_Delay(200);
+			  move(BACKWARDS, &prev_move);
 		  }
 
-		  HAL_Delay(3000);
+		  HAL_Delay(2600);
 
 		  move(STOP, &prev_move);
 		  turn(STRAIGHT, &prev_turn);
 
-		  HAL_Delay(1000);
 		  // Switching sides
 		  wall = 1 - wall;
 		  state = SEARCH;
@@ -431,31 +509,13 @@ int main(void) {
 
 
 	  case TEST:
-		  move(SLOW_FORWARDS, &prev_move);
+		  TIM3->CCR4 = percentageToTIM3(100);
 		  break;
 
 
 
 	  }
   }
-//	  lidarDistance = getLidarDistance();
-//	  irLeftDistance = getIrLeftDistance();
-//	  irRightDistance = getIrRightDistance();
-//
-//	  refreshAPDSData();
-//	  nearDistance = apdsDistance;
-//	  TIM3->CCR4 = percentageToTIM3(distanceToPercentage(lidarDistance));
-//
-//	  //HAL_Delay(5000);  // Delay for 5 second
-//	  //calibrate();
-//	  //HAL_Delay(5000);  // Delay for 5 second
-//	  //straighten();
-//
-//	  if (lidarDistance < 30)
-//	  {
-//		  HAL_Delay(5000);
-//		  smack();
-//	  }
 }
     /* USER CODE END WHILE */
 
@@ -488,10 +548,12 @@ void move(enum DRIVE_DIRECTION move_dir, enum DRIVE_DIRECTION *prev_move) {
 			stopMotor();
 			break;
 		case FORWARDS:
-			moveForwards(55);
+			// 9V: 55
+			moveForwards(60);
 			break;
 		case SLOW_FORWARDS:
-			moveForwards(30);
+			// 9V: 45
+			moveForwards(50);
 			break;
 		case BACKWARDS:
 			moveBackwards(55);
